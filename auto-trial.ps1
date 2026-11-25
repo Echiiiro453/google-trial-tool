@@ -57,6 +57,8 @@ $WAIT_TIMEOUT = 180
 $EXTRA_PRODUCTS = ""
 $INCLUDE_PROMOS = $false
 $UPGRADE_MODE = $false
+$OLD_PURCHASE_TOKEN = ""
+$REPLACE_MODE = 5
 $TARGET_OFFER = ""
 $EXPORT_PATH = ""
 $WEB_OUT = ""
@@ -121,9 +123,20 @@ while ($i -lt $args.Count) {
             $INCLUDE_PROMOS = $true
             $i++
         }
-        '^(-upgrade|--upgrade)$' {
+        '^(-upgrade|--upgrade|-stack|--stack)$' {
             $UPGRADE_MODE = $true
             $i++
+        }
+        '^(-old-token|--old-token)$' {
+            if ($i + 1 -ge $args.Count) { Stop-WithError "Faltando valor para $arg" }
+            $OLD_PURCHASE_TOKEN = $args[$i + 1]
+            $UPGRADE_MODE = $true
+            $i += 2
+        }
+        '^(-replace-mode|--replace-mode)$' {
+            if ($i + 1 -ge $args.Count) { Stop-WithError "Faltando valor para $arg" }
+            $REPLACE_MODE = [int]$args[$i + 1]
+            $i += 2
         }
         '^(-extra|--extra)$' {
             if ($i + 1 -ge $args.Count) { Stop-WithError "Faltando valor para $arg" }
@@ -632,6 +645,50 @@ render();
     [System.IO.File]::WriteAllText($outPath, $html, (New-Object System.Text.UTF8Encoding($false)))
 }
 
+function Get-PurchaseTokenFromLibraryDb([string]$skuHint = "g1.") {
+    $remoteDb = "/data/local/tmp/lib_read_$PID.db"
+    $localDb = Join-Path ([System.IO.Path]::GetTempPath()) "lib_read_$PID.db"
+    try {
+        try { & $ADB -s $script:DEVICE shell "cp /data/data/com.android.vending/databases/library.db $remoteDb 2>/dev/null; chmod 666 $remoteDb" 2>$null | Out-Null } catch {}
+        if (Test-Path -LiteralPath $localDb) { Remove-Item -LiteralPath $localDb -Force -ErrorAction SilentlyContinue }
+        try { & $ADB -s $script:DEVICE pull $remoteDb $localDb 2>$null | Out-Null } catch {}
+        try { & $ADB -s $script:DEVICE shell "rm -f $remoteDb" 2>$null | Out-Null } catch {}
+        if (-not (Test-Path -LiteralPath $localDb -PathType Leaf)) { return "" }
+
+        $pyCmd = @'
+import sqlite3, json, time, sys
+db_path, hint = sys.argv[1], sys.argv[2]
+con = sqlite3.connect(db_path)
+rows = con.execute("SELECT account, doc_id, subs_valid_until_time, inapp_purchase_data FROM ownership WHERE doc_id LIKE ?", (f"%{hint}%",)).fetchall()
+now_ms = int(time.time() * 1000)
+picked = None
+for acc, doc_id, valid, data in rows:
+    if not data: continue
+    try: j = json.loads(data)
+    except Exception: continue
+    tk = j.get("purchaseToken")
+    if not tk: continue
+    try: alive = int(valid) > now_ms
+    except Exception: alive = False
+    v = int(valid or 0)
+    if picked is None or (alive and not picked[2]) or (alive == picked[2] and v > picked[3]):
+        picked = (tk, acc, alive, v, doc_id)
+if picked:
+    print(f"{picked[0]}|{picked[1]}|{picked[2]}|{picked[4]}")
+'@
+        $out = try { (& python -c $pyCmd $localDb $skuHint 2>$null) -join "" } catch { "" }
+        $out = $out.Trim()
+        if ($out -and $out.Contains("|")) {
+            $parts = $out -split '\|', 4
+            Write-Ok "purchaseToken lido de library.db ($($parts[1]), ativo=$($parts[2]), doc=$($parts[3]))"
+            return $parts[0]
+        }
+    } finally {
+        if (Test-Path -LiteralPath $localDb) { Remove-Item -LiteralPath $localDb -Force -ErrorAction SilentlyContinue }
+    }
+    return ""
+}
+
 # ===== 4. Aplicar configurações e executar script Frida =====
 function Invoke-Frida($g1_pid, [string]$runMode, [string]$runTarget, [string]$runDuration, [string]$runOffer, [string]$fridaBin) {
     $tmp_script = Join-Path ([System.IO.Path]::GetTempPath()) ".frida-run-$PID.js"
@@ -640,14 +697,24 @@ function Invoke-Frida($g1_pid, [string]$runMode, [string]$runTarget, [string]$ru
     $export_items = [System.Collections.Generic.List[psobject]]::new()
 
     try {
+        $resolvedOldTok = $OLD_PURCHASE_TOKEN
+        if ($UPGRADE_MODE -and -not $resolvedOldTok -and $runMode -eq "activate") {
+            Write-Log "Lendo purchaseToken ativo de library.db..."
+            $resolvedOldTok = Get-PurchaseTokenFromLibraryDb "g1."
+            if (-not $resolvedOldTok) {
+                Write-Warn "Nenhum purchaseToken encontrado em library.db; tentando queryPurchasesAsync..."
+            }
+        }
+
         # Aplicar configuração no script com escape seguro
         $content = Get-Content -LiteralPath $FRIDA_SCRIPT -Raw -Encoding UTF8
-        $jsMode   = ConvertTo-JsStringLiteral $runMode
-        $jsTarget = ConvertTo-JsStringLiteral $runTarget
-        $jsOffer  = ConvertTo-JsStringLiteral $runOffer
-        $jsDur    = ConvertTo-JsStringLiteral $runDuration
-        $jsApk    = ConvertTo-JsStringLiteral $MODULE_APK_DEVICE
-        $jsExtra  = ConvertTo-JsStringLiteral $EXTRA_PRODUCTS
+        $jsMode    = ConvertTo-JsStringLiteral $runMode
+        $jsTarget  = ConvertTo-JsStringLiteral $runTarget
+        $jsOffer   = ConvertTo-JsStringLiteral $runOffer
+        $jsDur     = ConvertTo-JsStringLiteral $runDuration
+        $jsApk     = ConvertTo-JsStringLiteral $MODULE_APK_DEVICE
+        $jsExtra   = ConvertTo-JsStringLiteral $EXTRA_PRODUCTS
+        $jsOldTok  = ConvertTo-JsStringLiteral $resolvedOldTok
         $jsPromos  = if ($INCLUDE_PROMOS) { "true" } else { "false" }
         $jsUpgrade = if ($UPGRADE_MODE) { "true" } else { "false" }
         $content = [regex]::Replace($content, '(?m)^var MODE = .*', { param($m) "var MODE = $jsMode;" })
@@ -658,6 +725,8 @@ function Invoke-Frida($g1_pid, [string]$runMode, [string]$runTarget, [string]$ru
         $content = [regex]::Replace($content, '(?m)^var EXTRA_PRODUCTS = .*', { param($m) "var EXTRA_PRODUCTS = $jsExtra;" })
         $content = [regex]::Replace($content, '(?m)^var INCLUDE_PROMOS = .*', { param($m) "var INCLUDE_PROMOS = $jsPromos;" })
         $content = [regex]::Replace($content, '(?m)^var UPGRADE_MODE = .*', { param($m) "var UPGRADE_MODE = $jsUpgrade;" })
+        $content = [regex]::Replace($content, '(?m)^var OLD_PURCHASE_TOKEN = .*', { param($m) "var OLD_PURCHASE_TOKEN = $jsOldTok;" })
+        $content = [regex]::Replace($content, '(?m)^var REPLACE_MODE = .*', { param($m) "var REPLACE_MODE = $REPLACE_MODE;" })
         [System.IO.File]::WriteAllText($tmp_script, $content, (New-Object System.Text.UTF8Encoding($false)))
 
         Write-Log "Injetando (modo=$runMode alvo=$runTarget oferta=$runOffer duração=$runDuration)..."
@@ -749,7 +818,7 @@ function Invoke-Frida($g1_pid, [string]$runMode, [string]$runTarget, [string]$ru
                 }
                 elseif ($msg -like "SELECTED*") { Write-Ok $msg }
                 elseif ($msg -like "Waiting for Activity*") { Write-Log "Estabilizando Activity..." }
-                elseif ($msg -eq "UPGRADE_PARAMS_ATTACHED") { Write-Log "SubscriptionUpdateParams anexado (troca de plano)" }
+                elseif ($msg -like "UPGRADE_PARAMS_ATTACHED*") { Write-Log $msg }
                 elseif ($msg -like "BILLING_FLOW_LAUNCHED*") {
                     Write-Ok "Janela de pagamento aberta — confirme ou cancele no emulador (aguardando resultado até ${WAIT_TIMEOUT}s)..."
                     $flow_launched = $true

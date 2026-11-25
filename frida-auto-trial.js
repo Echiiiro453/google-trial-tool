@@ -14,7 +14,9 @@ var PREFER_DURATION = "longest"; // "longest" | "1mo" | "3mo" | "6mo" | "12mo"
 var MODULE_APK = "/data/local/tmp/module.apk";
 var EXTRA_PRODUCTS = "";         // IDs extras separados por vírgula
 var INCLUDE_PROMOS = false;      // true para incluir ofertas com desconto (não $0.00)
-var UPGRADE_MODE = false;        // true para usar SubscriptionUpdateParams (troca de plano)
+var UPGRADE_MODE = false;        // true para usar SubscriptionUpdateParams (troca/stack de plano)
+var OLD_PURCHASE_TOKEN = "";     // token lido do library.db ou passado via --old-token
+var REPLACE_MODE = 5;            // 5 = CHARGE_FULL_PRICE (ideal para stack)
 // ===== FIM CONFIG =====
 
 Java.perform(function() {
@@ -686,12 +688,25 @@ Java.perform(function() {
 
                             if (oldToken) {
                                 var SubUpdateParams = Java.use("com.android.billingclient.api.BillingFlowParams$SubscriptionUpdateParams");
-                                var sup = SubUpdateParams.newBuilder()
-                                    .setOldPurchaseToken(oldToken)
-                                    .setSubscriptionReplacementMode(1)
-                                    .build();
+                                var sb = SubUpdateParams.newBuilder();
+                                var modeApplied = false;
+                                try {
+                                    sb = sb.setReplaceProrationMode(REPLACE_MODE);
+                                    modeApplied = true;
+                                } catch (e1) {
+                                    try {
+                                        sb = sb.setReplaceSkusProrationMode(REPLACE_MODE);
+                                        modeApplied = true;
+                                    } catch (e2) {
+                                        try {
+                                            sb = sb.setSubscriptionReplacementMode(REPLACE_MODE);
+                                            modeApplied = true;
+                                        } catch (e3) {}
+                                    }
+                                }
+                                var sup = sb.setOldPurchaseToken(String(oldToken)).build();
                                 flowBuilder = flowBuilder.setSubscriptionUpdateParams(sup);
-                                Log.i(TAG, "UPGRADE_PARAMS_ATTACHED");
+                                Log.i(TAG, "UPGRADE_PARAMS_ATTACHED mode=" + REPLACE_MODE + " applied=" + modeApplied);
                             }
 
                             var r = bc.launchBillingFlow(Java.cast(uiAct, Activity), flowBuilder.build());
@@ -707,7 +722,9 @@ Java.perform(function() {
             launchHandler.postDelayed(LaunchRunnable, 1500);
         }
 
-        if (UPGRADE_MODE) {
+        if (OLD_PURCHASE_TOKEN) {
+            launchWithOptionalUpgrade(OLD_PURCHASE_TOKEN);
+        } else if (UPGRADE_MODE) {
             try {
                 var upgradeHandled = false;
                 var QueryPurchasesParams = Java.use("com.android.billingclient.api.QueryPurchasesParams");
