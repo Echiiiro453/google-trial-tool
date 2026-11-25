@@ -63,6 +63,7 @@ $TARGET_OFFER = ""
 $EXPORT_PATH = ""
 $WEB_OUT = ""
 $SHOW_MENU = ($args.Count -eq 0)
+$UI_LANG = "pt"
 
 # ===== Auxiliares =====
 function Write-Log($msg) { Write-Host "[*] $msg" }
@@ -170,6 +171,16 @@ while ($i -lt $args.Count) {
         '^(-menu|--menu)$' {
             $SHOW_MENU = $true
             $i++
+        }
+        '^(-lang|--lang)$' {
+            if ($i + 1 -ge $args.Count) { Stop-WithError "Faltando valor para $arg" }
+            $langVal = $args[$i + 1].ToLowerInvariant()
+            if ($langVal -in @("pt", "en", "zh")) {
+                $UI_LANG = $langVal
+            } else {
+                Stop-WithError "Idioma inválido: $($args[$i + 1]) (use pt, en ou zh)"
+            }
+            $i += 2
         }
         '^(-product|--product)$' {
             if ($i + 1 -ge $args.Count) { Stop-WithError "Faltando valor para $arg" }
@@ -914,18 +925,70 @@ Test-FridaVersion $FRIDA_BIN
 
 Find-Device
 
+$UI_TEXT = @{
+    pt = @{
+        menu_title = "Menu Principal"
+        opt1       = "[1] Listar e escolher avaliação (--list)"
+        opt2       = "[2] Buscar novos planos e escolher (--discover)"
+        opt3       = "[3] Ativar Pro 12 meses direto (pro12 12mo)"
+        opt4       = "[4] Gerar página checkout web (checkout.html)"
+        opt5       = "[5] Sniff em tempo real (--sniff)"
+        opt0       = "[0] Sair"
+        prompt     = "Opção (0-5)"
+        invalid    = "Opção inválida"
+        pick_title = "Escolha a avaliação para ativar"
+        pick_back  = "[0] Voltar ao menu"
+        pick_ask   = "Escolha"
+        activating = "Ativando"
+        months     = "meses grátis"
+    }
+    en = @{
+        menu_title = "Main Menu"
+        opt1       = "[1] List and pick free trial (--list)"
+        opt2       = "[2] Discover new plans and pick (--discover)"
+        opt3       = "[3] Activate Pro 12 months directly (pro12 12mo)"
+        opt4       = "[4] Generate web checkout page (checkout.html)"
+        opt5       = "[5] Live SKU sniff (--sniff)"
+        opt0       = "[0] Exit"
+        prompt     = "Option (0-5)"
+        invalid    = "Invalid option"
+        pick_title = "Select trial to activate"
+        pick_back  = "[0] Back to menu"
+        pick_ask   = "Choice"
+        activating = "Activating"
+        months     = "months free"
+    }
+    zh = @{
+        menu_title = "主菜单"
+        opt1       = "[1] 列出并选择免费试用 (--list)"
+        opt2       = "[2] 探测更多方案并选择 (--discover)"
+        opt3       = "[3] 直接激活 Pro 12 个月 (pro12 12mo)"
+        opt4       = "[4] 生成网页结账页 (checkout.html)"
+        opt5       = "[5] 实时抓包 SKU (--sniff)"
+        opt0       = "[0] 退出"
+        prompt     = "选项 (0-5)"
+        invalid    = "无效选项"
+        pick_title = "选择要激活的试用方案"
+        pick_back  = "[0] 返回主菜单"
+        pick_ask   = "选择"
+        activating = "正在激活"
+        months     = "个月免费"
+    }
+}
+
 function Invoke-MenuSession {
+    $t = $UI_TEXT[$UI_LANG]
     while ($true) {
         Write-Host ""
-        Write-Host "=== Menu Principal ($($script:DEVICE)) ===" -ForegroundColor Cyan
-        Write-Host "  [1] Listar e escolher avaliação (--list)"
-        Write-Host "  [2] Buscar novos planos e escolher (--discover)"
-        Write-Host "  [3] Ativar Pro 12 meses direto (pro12 12mo)"
-        Write-Host "  [4] Gerar página checkout web (checkout.html)"
-        Write-Host "  [5] Sniff em tempo real (--sniff)"
-        Write-Host "  [0] Sair"
+        Write-Host "=== $($t.menu_title) ($($script:DEVICE)) ===" -ForegroundColor Cyan
+        Write-Host "  $($t.opt1)"
+        Write-Host "  $($t.opt2)"
+        Write-Host "  $($t.opt3)"
+        Write-Host "  $($t.opt4)"
+        Write-Host "  $($t.opt5)"
+        Write-Host "  $($t.opt0)"
         Write-Host ""
-        $menuPick = Read-Host "Opção (0-5)"
+        $menuPick = Read-Host $t.prompt
 
         $runMode = "list"
         $runTarget = "auto"
@@ -941,7 +1004,7 @@ function Invoke-MenuSession {
             "4" { $runMode = "discover"; $script:WEB_OUT = Join-Path $SCRIPT_DIR "checkout.html" }
             "5" { $runMode = "sniff" }
             "0" { return }
-            default { Write-Warn "Opção inválida: $menuPick"; continue }
+            default { Write-Warn "$($t.invalid): $menuPick"; continue }
         }
 
         Write-Host ""
@@ -951,20 +1014,20 @@ function Invoke-MenuSession {
 
         if ($askPick -and $trials -and $trials.Count -gt 0) {
             Write-Host ""
-            Write-Host "=== Escolha a avaliação para ativar ===" -ForegroundColor Cyan
+            Write-Host "=== $($t.pick_title) ===" -ForegroundColor Cyan
             for ($idx = 0; $idx -lt $trials.Count; $idx++) {
-                $t = $trials[$idx]
-                Write-Host ("  [{0}] {1} ({2}) — {3} meses grátis" -f ($idx + 1), $t.Product, $t.OfferId, $t.Months)
+                $tr = $trials[$idx]
+                Write-Host ("  [{0}] {1} ({2}) — {3} {4}" -f ($idx + 1), $tr.Product, $tr.OfferId, $tr.Months, $t.months)
             }
-            Write-Host "  [0] Voltar ao menu"
+            Write-Host "  $($t.pick_back)"
             Write-Host ""
 
-            $choiceRaw = Read-Host "Escolha (0-$($trials.Count))"
+            $choiceRaw = Read-Host "$($t.pick_ask) (0-$($trials.Count))"
             $choice = 0
             if ([int]::TryParse($choiceRaw, [ref]$choice) -and $choice -ge 1 -and $choice -le $trials.Count) {
                 $picked = $trials[$choice - 1]
                 Write-Host ""
-                Write-Ok "Ativando: $($picked.Product) / $($picked.OfferId) ($($picked.DurArg))..."
+                Write-Ok "$($t.activating): $($picked.Product) / $($picked.OfferId) ($($picked.DurArg))..."
                 $g1_pid2 = Get-GoogleOnePid
                 Write-Host ""
                 $null = Invoke-Frida $g1_pid2 "activate" $picked.Product $picked.DurArg $picked.OfferId $FRIDA_BIN
