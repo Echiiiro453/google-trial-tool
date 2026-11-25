@@ -64,6 +64,7 @@ $EXPORT_PATH = ""
 $WEB_OUT = ""
 $SHOW_MENU = ($args.Count -eq 0)
 $UI_LANG = "pt"
+$LANG_EXPLICIT = $false
 
 # ===== Auxiliares =====
 function Write-Log($msg) { Write-Host "[*] $msg" }
@@ -177,6 +178,7 @@ while ($i -lt $args.Count) {
             $langVal = $args[$i + 1].ToLowerInvariant()
             if ($langVal -in @("pt", "en", "zh")) {
                 $UI_LANG = $langVal
+                $LANG_EXPLICIT = $true
             } else {
                 Stop-WithError "Idioma inválido: $($args[$i + 1]) (use pt, en ou zh)"
             }
@@ -977,7 +979,20 @@ $UI_TEXT = @{
 }
 
 function Invoke-MenuSession {
-    $t = $UI_TEXT[$UI_LANG]
+    if (-not $LANG_EXPLICIT) {
+        Write-Host "Idioma / Language / 语言:" -ForegroundColor Cyan
+        Write-Host "  [1] Português (Brasil)"
+        Write-Host "  [2] English"
+        Write-Host "  [3] 简体中文 (Chinese)"
+        Write-Host ""
+        $langPick = Read-Host "Escolha / Choice / 选择 (1-3, padrão 1)"
+        switch ($langPick) {
+            "2" { $script:UI_LANG = "en" }
+            "3" { $script:UI_LANG = "zh" }
+            default { $script:UI_LANG = "pt" }
+        }
+    }
+    $t = $UI_TEXT[$script:UI_LANG]
     while ($true) {
         Write-Host ""
         Write-Host "=== $($t.menu_title) ($($script:DEVICE)) ===" -ForegroundColor Cyan
