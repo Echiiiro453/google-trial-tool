@@ -124,7 +124,7 @@ Java.perform(function() {
         "g1.30gb.annual.1month_eft", "g1.30gb.annual.1year_ip_10p", "g1.30gb.annual.1year_ip_15p", "g1.30gb.annual.1year_ip_20p", "g1.30gb.annual.1year_ip_40p",
         "g1.play.helium", "g1.play.helium.student",
         "g1.helium.12months_ip_50p", "g1.helium.12months_ip_75p", "g1.helium.12months_ip_90p",
-        "g1.helium.3months_ip_75p.acq", "g1.helium.2months_ip_50p", "g1.helium.1month_ip_75p.acq", "g1.helium.1month_ip_90p.acq", "g1.helium.1month_ip_95p",
+        "g1.helium.6months_ip_50p", "g1.helium.3months_ip_75p.acq", "g1.helium.2months_ip_50p", "g1.helium.1month_ip_75p.acq", "g1.helium.1month_ip_90p.acq", "g1.helium.1month_ip_95p",
         "g1.helium.annual.12months_ip_10p.acq", "g1.helium.annual.12months_ip_25p.acq",
         "g1.youtube_premium_individual_add_on"
     ];

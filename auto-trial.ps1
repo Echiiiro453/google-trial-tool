@@ -145,6 +145,14 @@ while ($i -lt $args.Count) {
             $EXTRA_PRODUCTS = $args[$i + 1]
             $i += 2
         }
+        '^(-extra-file|--extra-file)$' {
+            if ($i + 1 -ge $args.Count) { Stop-WithError "Faltando valor para $arg" }
+            $extraFile = $args[$i + 1]
+            if (-not (Test-Path -LiteralPath $extraFile -PathType Leaf)) { Stop-WithError "Arquivo não encontrado: $extraFile" }
+            $fileIds = (Get-Content -LiteralPath $extraFile -Encoding UTF8) | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith("#") }
+            $EXTRA_PRODUCTS = ($fileIds -join ",")
+            $i += 2
+        }
         '^(-offer|--offer)$' {
             if ($i + 1 -ge $args.Count) { Stop-WithError "Faltando valor para $arg" }
             $TARGET_OFFER = $args[$i + 1]
