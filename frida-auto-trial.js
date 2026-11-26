@@ -87,15 +87,46 @@ Java.perform(function() {
         "g1.2tb.ai.subs_variant", "g1.ai.pro", "g1.30tb", "g1.2tb.ai"
     ];
     var SCAN_PRODUCTS = [
-        "g1.100gb", "g1.200gb", "g1.2tb", "g1.5tb", "g1.10tb", "g1.20tb",
+        "g1.100gb", "g1.200gb", "g1.2tb", "g1.5tb", "g1.10tb", "g1.20tb", "g1.30gb",
         "g1.play.100gb", "g1.play.200gb", "g1.play.2tb", "g1.play.5tb", "g1.play.10tb", "g1.play.30tb",
         "g1.100gb.yearly", "g1.200gb.yearly", "g1.2tb.yearly", "g1.2tb.ai.yearly", "g1.ai.pro.yearly",
         "g1.play.2tb.ai.yearly", "g1.play.ai.pro.yearly",
         "g1.play.2tb.ai.subs_variant", "g1.ai.pro.subs_variant", "g1.play.ai.pro.subs_variant",
         "g1.100gb.subs_variant", "g1.200gb.subs_variant", "g1.2tb.subs_variant",
-        "g1.2tb.ai.annual", "g1.5tb.ai", "g1.play.5tb.ai",
-        "g1.student.2tb.ai", "g1.play.student.2tb.ai",
-        "g1.play.2tb.ai_promo", "g1.2tb.ai_promo"
+        "g1.2tb.ai.annual", "g1.5tb.ai", "g1.play.5tb.ai", "g1.5tb.annual", "g1.2tb.annual", "g1.100gb.annual", "g1.200gb.annual", "g1.30gb.annual",
+        "g1.20tb.v2", "g1.play.2tb.ai.student", "g1.student.2tb.ai", "g1.play.student.2tb.ai",
+        "g1.play.2tb.ai_promo", "g1.2tb.ai_promo",
+        // SKUs extras (18m/15m/12m/Ultra/Helium/30GB/Descontos)
+        "g1.2tb.ai.18months_eft", "g1.2tb.ai.15months_eft", "g1.2tb.ai.12months_eft", "g1.2tb.ai.6months_eft", "g1.2tb.ai.3months_eft", "g1.2tb.ai.2months_eft",
+        "g1.2tb.ai.12months_ip_75p", "g1.2tb.ai.12months_ip_90p", "g1.2tb.ai.2months_ip_50p", "g1.2tb.ai.3months_ip_50p",
+        "g1.20tb.1month_eft.acq", "g1.ai.ultra.1month_eft.acq", "g1.20tb.3months_ip_90p.acq", "g1.ai.ultra.3months_ip_90p.acq",
+        "g1.20tb.3months_ip_90p", "g1.20tb.3months_ip_80p", "g1.ai.ultra.3months_ip_75p.acq",
+        "g1.2tb.1year_eft", "g1.2tb.6months_eft", "g1.2tb.3months_eft", "g1.2tb.1month_eft",
+        "g1.2tb.12months_ip.4.99", "g1.2tb.6months_ip.4.99", "g1.2tb.3months_ip.2.49", "g1.2tb.1month_ip.2.49",
+        "g1.2tb.1month_ip_50p", "g1.2tb.1month_ip_80p", "g1.2tb.1month_ip_85p.acq", "g1.2tb.1month_ip_90p.acq", "g1.2tb.1month_ip_95p.acq",
+        "g1.2tb.2months_ip_50p.acq", "g1.2tb.2months_ip_75p", "g1.2tb.2months_ip_80p",
+        "g1.2tb.3months_ip_50p", "g1.2tb.3months_ip_50p.acq", "g1.2tb.3months_ip_80p", "g1.2tb.3months_ip_85p.acq",
+        "g1.2tb.annual.1month_eft", "g1.2tb.annual.3months_eft",
+        "g1.2tb.annual.12months_ip_10p", "g1.2tb.annual.12months_ip_15p", "g1.2tb.annual.12months_ip_20p", "g1.2tb.annual.12months_ip_25p.acq", "g1.2tb.annual.12months_ip_40p",
+        "g1.100gb.1year_eft", "g1.100gb.3months_eft", "g1.100gb.2months_eft", "g1.100gb.1month_eft",
+        "g1.100gb.12months_ip.0.49", "g1.100gb.12months_ip.0.99", "g1.100gb.6months_ip.0.99", "g1.100gb.6months_ip_75p",
+        "g1.100gb.3months_ip_50p", "g1.100gb.3months_ip_50p.acq", "g1.100gb.3months_ip_85p.acq",
+        "g1.100gb.2months_ip_75p", "g1.100gb.1month_ip.0.49", "g1.100gb.1month_ip.0.99", "g1.100gb.1month_ip_50p", "g1.100gb.1month_ip_85p.acq", "g1.100gb.1month_ip_95p.acq",
+        "g1.100gb.annual.1year_eft", "g1.100gb.annual.3months_eft", "g1.100gb.annual.1month_eft",
+        "g1.100gb.annual.12months_ip_10p", "g1.100gb.annual.12months_ip_15p", "g1.100gb.annual.12months_ip_20p", "g1.100gb.annual.12months_ip_40p",
+        "g1.200gb.1year_eft", "g1.200gb.3months_eft", "g1.200gb.1month_eft",
+        "g1.200gb.12months_ip.1.49", "g1.200gb.6months_ip.1.49", "g1.200gb.3months_ip_50p", "g1.200gb.3months_ip_50p.acq", "g1.200gb.3months_ip_85p.acq",
+        "g1.200gb.2months_ip_75p", "g1.200gb.1month_ip_50p", "g1.200gb.1month_ip_85p.acq", "g1.200gb.1month_ip_95p.acq",
+        "g1.200gb.annual.3months_eft", "g1.200gb.annual.1month_eft",
+        "g1.200gb.annual.12months_ip_10p", "g1.200gb.annual.12months_ip_15p", "g1.200gb.annual.12months_ip_20p", "g1.200gb.annual.12months_ip_40p",
+        "g1.30gb.1month_eft", "g1.30gb.1month_ip_75p", "g1.30gb.1month_ip_85p.acq", "g1.30gb.1month_ip_95p.acq",
+        "g1.30gb.3month_ip_75p", "g1.30gb.3months_ip_50p.acq", "g1.30gb.3months_ip_85p.acq", "g1.30gb.6month_ip_50p", "g1.30gb.12month_ip_50p",
+        "g1.30gb.annual.1month_eft", "g1.30gb.annual.1year_ip_10p", "g1.30gb.annual.1year_ip_15p", "g1.30gb.annual.1year_ip_20p", "g1.30gb.annual.1year_ip_40p",
+        "g1.play.helium", "g1.play.helium.student",
+        "g1.helium.12months_ip_50p", "g1.helium.12months_ip_75p", "g1.helium.12months_ip_90p",
+        "g1.helium.3months_ip_75p.acq", "g1.helium.2months_ip_50p", "g1.helium.1month_ip_75p.acq", "g1.helium.1month_ip_90p.acq", "g1.helium.1month_ip_95p",
+        "g1.helium.annual.12months_ip_10p.acq", "g1.helium.annual.12months_ip_25p.acq",
+        "g1.youtube_premium_individual_add_on"
     ];
 
     var PRODUCTS = [];
