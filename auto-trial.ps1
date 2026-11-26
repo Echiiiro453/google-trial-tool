@@ -288,6 +288,9 @@ switch -Regex ($TARGET) {
     '^(5x|ultra5x)$'   { $TARGET = "g1.play.20tb" }
     '^pro$'            { $TARGET = "g1.play.2tb.ai" }
     '^pro12$'          { $TARGET = "g1.2tb.ai.subs_variant" }
+    '^pro15$'          { $TARGET = "g1.2tb.ai.15months_eft" }
+    '^pro18$'          { $TARGET = "g1.2tb.ai.18months_eft" }
+    '^pro75$'          { $TARGET = "g1.2tb.ai.12months_ip_75p"; $INCLUDE_PROMOS = $true }
     '^(auto|g1\..*)$'  { } # manter como está
     default {
         Stop-WithError "Produto desconhecido: $TARGET (use pro, 5x, 20x, pro12 ou um ID de produto g1.*)"
@@ -822,7 +825,18 @@ function Invoke-Frida($g1_pid, [string]$runMode, [string]$runTarget, [string]$ru
                 }
                 elseif ($msg -like "TRIALS_FOUND*") { Write-Host ""; Write-Log $msg }
                 elseif ($msg -like "PROMOS_FOUND*") { Write-Log $msg }
-                elseif ($msg -like "  PROMO *") { Write-Warn $msg }
+                elseif ($msg -like "  PROMO *") {
+                    Write-Warn $msg
+                    if ($INCLUDE_PROMOS -and $msg -match '^\s*PROMO\s+(\S+)\s+/\s+(\S+)\s+—\s+(.+)$') {
+                        $discovered_trials.Add([pscustomobject]@{
+                            Product = $Matches[1]
+                            OfferId = $Matches[2]
+                            Months  = 0
+                            DurArg  = "longest"
+                            Label   = "PROMO $($Matches[3])"
+                        })
+                    }
+                }
                 elseif ($msg -like "JSON_EXPORT_ITEM *") {
                     if ($EXPORT_PATH -or $WEB_OUT) {
                         $rawJson = $msg.Substring("JSON_EXPORT_ITEM ".Length)
@@ -931,14 +945,15 @@ $UI_TEXT = @{
     pt = @{
         menu_title = "Menu Principal"
         opt1       = "[1] Listar e escolher avaliação (--list)"
-        opt2       = "[2] Buscar novos planos e escolher (--discover)"
-        opt3       = "[3] Ativar Pro 12 meses direto (pro12 12mo)"
-        opt4       = "[4] Gerar página checkout web (checkout.html)"
-        opt5       = "[5] Sniff em tempo real (--sniff)"
+        opt2       = "[2] Varrer 150+ SKUs / 18m / 15m / Descontos (--scan --promos)"
+        opt3       = "[3] Busca combinatória ampla (--discover)"
+        opt4       = "[4] Ativar Pro 18 meses grátis direto (pro18)"
+        opt5       = "[5] Gerar página checkout web (checkout.html)"
+        opt6       = "[6] Sniff em tempo real (--sniff)"
         opt0       = "[0] Sair"
-        prompt     = "Opção (0-5)"
+        prompt     = "Opção (0-6)"
         invalid    = "Opção inválida"
-        pick_title = "Escolha a avaliação para ativar"
+        pick_title = "Escolha a oferta para ativar"
         pick_back  = "[0] Voltar ao menu"
         pick_ask   = "Escolha"
         activating = "Ativando"
@@ -947,14 +962,15 @@ $UI_TEXT = @{
     en = @{
         menu_title = "Main Menu"
         opt1       = "[1] List and pick free trial (--list)"
-        opt2       = "[2] Discover new plans and pick (--discover)"
-        opt3       = "[3] Activate Pro 12 months directly (pro12 12mo)"
-        opt4       = "[4] Generate web checkout page (checkout.html)"
-        opt5       = "[5] Live SKU sniff (--sniff)"
+        opt2       = "[2] Scan 150+ SKUs / 18m / 15m / Discounts (--scan --promos)"
+        opt3       = "[3] Combinatorial discovery (--discover)"
+        opt4       = "[4] Activate Pro 18 months free directly (pro18)"
+        opt5       = "[5] Generate web checkout page (checkout.html)"
+        opt6       = "[6] Live SKU sniff (--sniff)"
         opt0       = "[0] Exit"
-        prompt     = "Option (0-5)"
+        prompt     = "Option (0-6)"
         invalid    = "Invalid option"
-        pick_title = "Select trial to activate"
+        pick_title = "Select offer to activate"
         pick_back  = "[0] Back to menu"
         pick_ask   = "Choice"
         activating = "Activating"
@@ -963,14 +979,15 @@ $UI_TEXT = @{
     zh = @{
         menu_title = "主菜单"
         opt1       = "[1] 列出并选择免费试用 (--list)"
-        opt2       = "[2] 探测更多方案并选择 (--discover)"
-        opt3       = "[3] 直接激活 Pro 12 个月 (pro12 12mo)"
-        opt4       = "[4] 生成网页结账页 (checkout.html)"
-        opt5       = "[5] 实时抓包 SKU (--sniff)"
+        opt2       = "[2] 扫描 150+ SKU / 18个月 / 15个月 / 折扣 (--scan --promos)"
+        opt3       = "[3] 组合矩阵探测 (--discover)"
+        opt4       = "[4] 直接激活 Pro 18 个月免费 (pro18)"
+        opt5       = "[5] 生成网页结账页 (checkout.html)"
+        opt6       = "[6] 实时抓包 SKU (--sniff)"
         opt0       = "[0] 退出"
-        prompt     = "选项 (0-5)"
+        prompt     = "选项 (0-6)"
         invalid    = "无效选项"
-        pick_title = "选择要激活的试用方案"
+        pick_title = "选择要激活的优惠方案"
         pick_back  = "[0] 返回主菜单"
         pick_ask   = "选择"
         activating = "正在激活"
@@ -1001,6 +1018,7 @@ function Invoke-MenuSession {
         Write-Host "  $($t.opt3)"
         Write-Host "  $($t.opt4)"
         Write-Host "  $($t.opt5)"
+        Write-Host "  $($t.opt6)"
         Write-Host "  $($t.opt0)"
         Write-Host ""
         $menuPick = Read-Host $t.prompt
@@ -1011,13 +1029,15 @@ function Invoke-MenuSession {
         $runOffer = ""
         $askPick = $false
         $script:WEB_OUT = ""
+        $script:INCLUDE_PROMOS = $false
 
         switch ($menuPick) {
             "1" { $runMode = "list"; $askPick = $true }
-            "2" { $runMode = "discover"; $askPick = $true }
-            "3" { $runMode = "activate"; $runTarget = "g1.2tb.ai.subs_variant"; $runDur = "12mo" }
-            "4" { $runMode = "discover"; $script:WEB_OUT = Join-Path $SCRIPT_DIR "checkout.html" }
-            "5" { $runMode = "sniff" }
+            "2" { $runMode = "scan"; $script:INCLUDE_PROMOS = $true; $askPick = $true }
+            "3" { $runMode = "discover"; $askPick = $true }
+            "4" { $runMode = "activate"; $runTarget = "g1.2tb.ai.18months_eft"; $runDur = "longest" }
+            "5" { $runMode = "discover"; $script:WEB_OUT = Join-Path $SCRIPT_DIR "checkout.html" }
+            "6" { $runMode = "sniff" }
             "0" { return }
             default { Write-Warn "$($t.invalid): $menuPick"; continue }
         }
@@ -1032,7 +1052,8 @@ function Invoke-MenuSession {
             Write-Host "=== $($t.pick_title) ===" -ForegroundColor Cyan
             for ($idx = 0; $idx -lt $trials.Count; $idx++) {
                 $tr = $trials[$idx]
-                Write-Host ("  [{0}] {1} ({2}) — {3} {4}" -f ($idx + 1), $tr.Product, $tr.OfferId, $tr.Months, $t.months)
+                $desc = if ($tr.PSObject.Properties["Label"] -and $tr.Label) { $tr.Label } else { "$($tr.Months) $($t.months)" }
+                Write-Host ("  [{0}] {1} ({2}) — {3}" -f ($idx + 1), $tr.Product, $tr.OfferId, $desc)
             }
             Write-Host "  $($t.pick_back)"
             Write-Host ""
