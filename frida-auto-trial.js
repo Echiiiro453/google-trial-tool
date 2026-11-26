@@ -605,26 +605,27 @@ Java.perform(function() {
                 return;
             }
         } else {
-            if (trials.length === 0) {
-                if (INCLUDE_PROMOS && promos.length > 0) {
-                    trials = promos;
-                } else {
-                    Log.i(TAG, "=== NO_TRIALS ===");
-                    closeBillingClient();
-                    return;
-                }
-            }
-
-            // Filtrar pelo produto alvo
+            // Filtrar pelo produto alvo primeiro em trials; se vazio e INCLUDE_PROMOS, tentar promos
             var candidates = [];
             for (var i = 0; i < trials.length; i++) {
                 if (TARGET_PRODUCT === "auto" || trials[i].product === TARGET_PRODUCT) {
                     candidates.push(trials[i]);
                 }
             }
+            if (candidates.length === 0 && INCLUDE_PROMOS && promos.length > 0) {
+                for (var i = 0; i < promos.length; i++) {
+                    if (TARGET_PRODUCT === "auto" || promos[i].product === TARGET_PRODUCT) {
+                        candidates.push(promos[i]);
+                    }
+                }
+            }
             if (candidates.length === 0) {
-                Log.e(TAG, "Nenhuma avaliação para alvo=" + TARGET_PRODUCT);
-                Log.i(TAG, "=== SELECT_FAILED ===");
+                if (trials.length === 0 && (!INCLUDE_PROMOS || promos.length === 0)) {
+                    Log.i(TAG, "=== NO_TRIALS ===");
+                } else {
+                    Log.e(TAG, "Nenhuma avaliação/promo para alvo=" + TARGET_PRODUCT);
+                    Log.i(TAG, "=== SELECT_FAILED ===");
+                }
                 closeBillingClient();
                 return;
             }
