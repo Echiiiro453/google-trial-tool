@@ -139,6 +139,9 @@ Java.perform(function() {
         }
     }
     for (var bp = 0; bp < BASE_PRODUCTS.length; bp++) addProductId(BASE_PRODUCTS[bp]);
+    if (TARGET_PRODUCT && TARGET_PRODUCT !== "auto") {
+        addProductId(TARGET_PRODUCT);
+    }
     if (MODE === "scan" || MODE === "discover") {
         for (var sp = 0; sp < SCAN_PRODUCTS.length; sp++) addProductId(SCAN_PRODUCTS[sp]);
     }
